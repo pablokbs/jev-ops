@@ -1,0 +1,21 @@
+{
+  "name": "jev-ops-live-cluster",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Live-cluster demo dashboard: jev-ops reading application and Kubernetes logs from a real cluster",
+  "scripts": {
+    "build": "tsc",
+    "dev": "npm run build && node dist/server.js",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test \"dist/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

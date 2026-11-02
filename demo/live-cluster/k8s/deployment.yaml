@@ -1,0 +1,68 @@
+# jev-ops live-cluster demo: application deployment.
+#
+# Local (kind): `scripts/demo-up.sh` builds `demo-app:local`, loads it into the
+# cluster and applies this manifest — `imagePullPolicy: IfNotPresent` picks up
+# the preloaded image without any registry.
+#
+# Cloud cluster on talk day: publish the image first (`scripts/publish-image.sh`)
+# and point this manifest at it with:
+#   kubectl set image deployment/demo-app demo-app=<registry>/<owner>/jev-ops-demo-app:<tag>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  labels:
+    app: demo-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+      restartPolicy: Always
+      volumes:
+        - name: fault-flag
+          emptyDir: {}
+      containers:
+        - name: demo-app
+          image: demo-app:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: PORT
+              value: "3000"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              # 128Mi keeps the /oom fault fast and visible (exit 137, OOMKilled).
+              memory: 128Mi
+          volumeMounts:
+            # Fault flags live here: they survive container restarts (crash/OOM
+            # loops persist) and disappear when the pod is recreated (recovery).
+            - name: fault-flag
+              mountPath: /var/fault
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3

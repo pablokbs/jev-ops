@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>jev-ops · Live Cluster Demo</title>
+  <meta name="description" content="jev-ops reading application and Kubernetes logs from a real cluster — typed probabilistic decisions from TypeSafe Jev.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">jev-ops</span>
+      <span class="brand-sub">live cluster demo</span>
+    </div>
+    <div class="pills">
+      <span class="pill" id="statusPill" data-state="unknown">cluster …</span>
+      <span class="pill muted" id="contextPill">context …</span>
+      <span class="pill" id="replicasPill">replicas …</span>
+      <span class="pill" id="jevPill" data-state="unknown">jev …</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Left: cluster + controls -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Pods <code class="dim">-l app=demo-app</code></h2>
+        <span class="legend">
+          <span><i class="sq running"></i>running</span>
+          <span><i class="sq starting"></i>starting</span>
+          <span><i class="sq crashloop"></i>crashloop</span>
+          <span><i class="sq oom"></i>oom</span>
+        </span>
+      </div>
+      <div class="pods" id="podsGrid"><div class="empty">no pods yet</div></div>
+
+      <div class="controls">
+        <div class="fault-row">
+          <button class="btn fault" data-mode="boom">500s</button>
+          <button class="btn fault" data-mode="crash">Crash</button>
+          <button class="btn fault" data-mode="oom">OOM</button>
+          <button class="btn recover" data-mode="reset">Recover</button>
+        </div>
+        <button class="btn analyze" id="analyzeBtn">⚡ Analyze now</button>
+      </div>
+
+      <div class="activity" id="activityLog"><span class="dim">triggered faults and analysis events appear here</span></div>
+    </section>
+
+    <!-- Right: logs -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Diagnostic input</h2>
+        <div class="tabs">
+          <button class="tab active" data-kind="app">App logs</button>
+          <button class="tab" data-kind="k8s">Cluster events</button>
+        </div>
+      </div>
+      <div class="logs" id="logPane"><div class="empty">collecting logs…</div></div>
+    </section>
+  </main>
+
+  <!-- Verdicts -->
+  <section class="panel verdicts">
+    <div class="panel-head">
+      <h2>Jev's typed decisions</h2>
+      <span class="dim" id="verdictTs"></span>
+    </div>
+    <div class="verdict-grid" id="verdicts">
+      <div class="empty">press <strong>Analyze now</strong> — jev-ops reads the logs and returns typed decisions with confidence</div>
+    </div>
+  </section>
+
+  <!-- Footer: the real commands -->
+  <footer class="terminal">
+    <div class="term-head">shell — the exact commands behind the last analysis</div>
+    <pre id="lastCommand" class="term-body"># nothing yet — press "Analyze now"
+# example:
+#   kubectl logs -l app=demo-app --tail=100 | jev-ops analyze demo-app --json</pre>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

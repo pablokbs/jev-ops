@@ -1,0 +1,5 @@
+# jev-ops live-cluster demo
+node_modules/
+dist/
+.env
+*.kubeconfig

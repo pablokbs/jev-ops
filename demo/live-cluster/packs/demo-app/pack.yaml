@@ -1,0 +1,63 @@
+api_version: "jev-ops/v1"
+kind: "DiagnosticPack"
+
+metadata:
+  name: "demo-app"
+  version: "0.1.0"
+  description: "Diagnostics for the jev-ops live-cluster demo web service"
+  author: "jev-ops"
+
+spec:
+  input:
+    type: "text"
+    max_bytes: 524288
+
+  decisions:
+    health:
+      type: "choice"
+      values:
+        - healthy
+        - degraded
+        - unhealthy
+        - unknown
+
+    root_cause:
+      type: "choice"
+      values:
+        - normal
+        - errors_5xx
+        - crashloop
+        - oom_killed
+        - db_connection
+        - slow_latency
+        - unknown
+
+    severity:
+      type: "score"
+      min: 0
+      max: 5
+      levels:
+        - "Normal: no errors or anomalies in the signals"
+        - "Informational: notable events with no impact on service"
+        - "Minor: isolated errors or warnings with no user-visible impact"
+        - "Degraded: partial impairment, elevated errors or latency for some users or requests"
+        - "Serious: a major component is failing or most requests are affected; urgent action needed"
+        - "Critical: outage, data loss or corruption risk, or active security compromise"
+
+    needs_attention:
+      type: "boolean"
+
+  instructions: |
+    Analyze application logs from the demo web service (JSON log lines with ts/pod/level/msg).
+
+    Determine whether the service is healthy, degraded, or unhealthy, and pick the
+    most probable root cause from the domain options:
+
+    - errors_5xx: sustained HTTP 500 responses with upstream/database errors
+    - crashloop: the process keeps exiting and the container restarts repeatedly
+    - oom_killed: the container was killed for exceeding its memory limit
+    - db_connection: connection refused or timeouts talking to the database
+    - slow_latency: requests completing slowly, query latency spikes
+
+    A healthy service logs request completions at info level and occasional
+    warnings without user-visible impact; it does not need attention.
