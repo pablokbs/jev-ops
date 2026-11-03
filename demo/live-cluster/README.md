@@ -167,6 +167,16 @@ This is the "typed decisions → bounded automation" payoff. Two beats: one it f
 - *Escalation shows up right after a successful heal?* Expected if warning events are still in the 5-minute window — point at the green squares: *"conservative beats silent; a human closes it."* (`kubectl delete events --all` clears the footprint.)
 - *Venue Slack unreachable?* The feed chip reads `slack failed` — the dashboard feed was the channel all along.
 
+### Speaker backup — how one Analyze actually flows (Q&A ammo)
+
+Keep these five bullets in your pocket for questions; full detail lives in *How it works* above.
+
+1. One click runs **two `jev-ops` processes in parallel**: `jev-ops analyze demo-app --pack-dir demo/live-cluster/packs --provider typesafe --json` and the same with `kubernetes`. Input goes in over **stdin as plain text** (100 log lines + a pod status summary — no files, no JSON arguments).
+2. The `kubernetes` pack is **not read from disk**: it's compiled into the binary. `--pack-dir` is what makes your custom `demo-app/pack.yaml` visible — that pack is the only thing we added. *"A new diagnosis is a new YAML, zero Rust"* — that's the *packs are data* story.
+3. The binary is not a dumb proxy: it enforces the pack's `max_bytes`, builds the model request from the pack's `instructions`, calls TypeSafe with your key (3 retries, backoff on 429/5xx), and **validates the model's answer against the pack schema** — a violation exits 6 and renders as a typed error card, never a 500.
+4. The Node server: disarmed → renders the outcomes, nothing else. Armed → `evaluatePolicy` post-processes them: `kubectl delete pod` when it provably can fix the root cause, a 🚨 escalation when it can't. **Slack fires on escalations only**, never on actions.
+5. `JEVOPS_PROVIDER=mock` is the exact same pipeline minus the model call — the deterministic classifier ships in the binary, which is why rehearsals and the e2e need no API key and no network.
+
 ## Talk day — cloud cluster checklist
 
 The MacBook stays fast; the demo runs against a small cloud cluster.
