@@ -43,6 +43,8 @@
           <button class="btn recover" data-mode="reset">Recover</button>
         </div>
         <button class="btn analyze" id="analyzeBtn">⚡ Analyze now</button>
+        <button class="btn autopilot" id="autopilotBtn" data-armed="false" title="when armed, Jev's high-confidence decisions act on the cluster: delete (restart) the failing pods">🤖 Autopilot: DISARMED</button>
+        <span class="pill muted" id="policyPill">policy …</span>
       </div>
 
       <div class="activity" id="activityLog"><span class="dim">triggered faults and analysis events appear here</span></div>
@@ -70,6 +72,15 @@
     <div class="verdict-grid" id="verdicts">
       <div class="empty">press <strong>Analyze now</strong> — jev-ops reads the logs and returns typed decisions with confidence</div>
     </div>
+  </section>
+
+  <!-- Automation feed: what the autopilot did and why, plus escalations -->
+  <section class="panel automation">
+    <div class="panel-head">
+      <h2>🤖 Automation — jev closes the loop</h2>
+      <span class="dim" id="automationNote">disarmed: analysis only, hands off the cluster</span>
+    </div>
+    <div class="automation-feed" id="automationFeed"><div class="empty">no autopilot activity yet — arm it and trigger a fault</div></div>
   </section>
 
   <!-- Footer: the real commands -->

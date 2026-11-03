@@ -118,9 +118,22 @@ function renderLogs() {
     pane.innerHTML = '<div class="empty">no log lines yet</div>';
     return;
   }
-  const className = state.logKind === 'app' ? 'log-line' : 'ev-line';
-  pane.innerHTML = lines.map((l) => `<div class="${className}">${escapeHtml(l)}</div>`).join('');
+  pane.innerHTML = lines.map((l) => `<div class="${logLineClass(l)}">${escapeHtml(l)}</div>`).join('');
   pane.scrollTop = 0; // newest lines are rendered at the top
+}
+
+// Color by level: app logs are JSON with "level":"info|warn|error" (kubectl
+// prefix ignored); k8s pane mixes warning events with neutral pod summaries.
+function logLineClass(line) {
+  if (state.logKind !== 'app') {
+    return line.includes(' status: ') ? 'ev-line pod-status' : 'ev-line';
+  }
+  const m = line.match(/"level"\s*:\s*"(\w+)"/);
+  const lvl = (m?.[1] ?? '').toLowerCase();
+  if (lvl === 'error' || lvl === 'fatal') return 'log-line lvl-error';
+  if (lvl === 'warn' || lvl === 'warning') return 'log-line lvl-warn';
+  if (lvl === 'info' || lvl === 'debug') return 'log-line lvl-info';
+  return 'log-line';
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +162,11 @@ async function analyze() {
         .map((a) => `# ${a.pack}\n$ ${a.command}`)
         .join('\n\n');
       $('lastCommand').textContent = commands;
+      // Why the autopilot acted (or didn't) on this analysis.
+      if (data.automation?.decision) {
+        const auto = data.automation;
+        $('automationNote').textContent = `${auto.armed ? 'ARMED' : 'disarmed'} — ${auto.decision.reason}`;
+      }
     }
     $('verdictTs').textContent = new Date(data.ts ?? Date.now()).toLocaleTimeString();
   } catch (err) {
@@ -239,6 +257,87 @@ function activity(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Autopilot: arm/disarm the closed loop + automation feed
+// ---------------------------------------------------------------------------
+async function toggleAutopilot() {
+  const btn = $('autopilotBtn');
+  const armed = btn.dataset.armed !== 'true';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/autopilot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ armed }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+    renderAutopilot(data);
+    activity(armed ? '🤖 autopilot ARMED — Jev can restart pods' : '🤖 autopilot disarmed');
+  } catch (err) {
+    activity(`❌ autopilot toggle failed: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function pollAutopilot() {
+  try {
+    const res = await fetch('/api/autopilot');
+    if (!res.ok) return;
+    renderAutopilot(await res.json());
+  } catch {
+    /* server down; keep last state */
+  }
+}
+
+function renderAutopilot(data) {
+  const btn = $('autopilotBtn');
+  btn.dataset.armed = String(Boolean(data.armed));
+  btn.textContent = data.armed ? '🤖 Autopilot: ARMED' : '🤖 Autopilot: DISARMED';
+
+  if (data.policy) {
+    const p = data.policy;
+    $('policyPill').textContent =
+      `sev≥${p.minSeverity} · conf≥${Math.round(p.minConfidence * 100)}% · delete pods · ${p.maxAttempts} try`;
+  }
+
+  const note = $('automationNote');
+  if (data.armed && note.textContent.startsWith('disarmed')) {
+    note.textContent = 'ARMED — acting on high-confidence decisions (watch this feed)';
+  } else if (!data.armed && !note.textContent.startsWith('disarmed')) {
+    note.textContent = 'disarmed: analysis only, hands off the cluster';
+  }
+
+  renderAutomationFeed(data.feed ?? []);
+}
+
+function renderAutomationFeed(feed) {
+  const el = $('automationFeed');
+  if (!feed.length) {
+    el.innerHTML = '<div class="empty">no autopilot activity yet — arm it and trigger a fault</div>';
+    return;
+  }
+  el.innerHTML = feed
+    .map((e) => {
+      const icon = e.kind === 'action' ? '🤖' : e.kind === 'alert' ? '🚨' : 'ℹ️';
+      const time = new Date(e.ts).toLocaleTimeString();
+      const slack =
+        e.kind === 'alert'
+          ? e.slack === 'sent'
+            ? '<span class="chip good">slack sent</span>'
+            : e.slack === 'failed'
+              ? '<span class="chip bad">slack failed</span>'
+              : '<span class="chip">slack off</span>'
+          : '';
+      return `<div class="feed-line ${e.kind}">
+        <span class="feed-time dim">${time}</span> ${icon} <span class="feed-text">${escapeHtml(e.text)}</span> ${slack}
+        ${e.detail ? `<div class="feed-detail dim">$ ${escapeHtml(e.detail)}</div>` : ''}
+      </div>`;
+    })
+    .join('');
+}
+
+// ---------------------------------------------------------------------------
 // Config pill (API key presence, jev-ops binary)
 // ---------------------------------------------------------------------------
 async function pollConfig() {
@@ -275,9 +374,13 @@ document.querySelectorAll('.tab').forEach((tab) => {
   });
 });
 
+$('autopilotBtn').addEventListener('click', toggleAutopilot);
+
 setInterval(pollStatus, POLL_MS);
 setInterval(pollLogs, POLL_MS);
+setInterval(pollAutopilot, POLL_MS);
 pollStatus();
 pollLogs();
+pollAutopilot();
 pollConfig();
 setInterval(pollConfig, 10_000);

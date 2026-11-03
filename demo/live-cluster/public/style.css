@@ -258,6 +258,70 @@ code {
   cursor: progress;
 }
 
+.btn.autopilot {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.btn.autopilot[data-armed='true'] {
+  border-color: var(--bad);
+  color: #fff;
+  background: var(--bad);
+  font-weight: 700;
+  animation: pulse 1.1s infinite;
+}
+
+.btn.autopilot:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+/* ---------- automation feed ---------- */
+.automation-feed {
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+}
+
+.feed-line {
+  padding: 6px 9px;
+  margin-bottom: 6px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  line-height: 1.45;
+}
+
+.feed-line.action {
+  border-left-color: var(--accent);
+}
+
+.feed-line.alert {
+  border-left-color: var(--bad);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.feed-line .chip {
+  margin-left: 6px;
+}
+
+.feed-time {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+
+.feed-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.feed-detail {
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+
 /* ---------- activity ---------- */
 .activity {
   margin-top: 10px;
@@ -310,10 +374,28 @@ code {
   word-break: break-all;
 }
 
+/* app log levels: info blue, warning orange, error red */
+.log-line.lvl-info {
+  color: #7aa2f8;
+}
+
+.log-line.lvl-warn {
+  color: var(--warn);
+}
+
+.log-line.lvl-error {
+  color: var(--bad);
+}
+
 .ev-line {
   color: var(--warn);
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* pod summary lines in the events tab stay neutral so warnings stand out */
+.ev-line.pod-status {
+  color: var(--text-dim);
 }
 
 /* ---------- verdicts ---------- */

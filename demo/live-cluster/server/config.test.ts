@@ -18,6 +18,13 @@ test('defaults when no environment is set', () => {
   assert.equal(cfg.demoAppPort, 3000);
   assert.equal(cfg.analyzeTail, 100);
   assert.equal(cfg.eventsWindowMinutes, 5);
+  // Autopilot: disarmed by default, conservative gates, no Slack.
+  assert.equal(cfg.autopilotArmed, false);
+  assert.equal(cfg.autopilotIntervalMs, 15000);
+  assert.equal(cfg.autopilotMinConfidence, 0.85);
+  assert.equal(cfg.autopilotMinSeverity, 4);
+  assert.equal(cfg.autopilotMaxAttempts, 1);
+  assert.equal(cfg.slackWebhookUrl, null);
 });
 
 test('environment overrides are honoured', () => {
@@ -35,6 +42,12 @@ test('environment overrides are honoured', () => {
     DEMO_APP_PORT: '4000',
     ANALYZE_TAIL: '250',
     K8S_EVENTS_WINDOW: '10',
+    AUTOPILOT_ARMED: 'true',
+    AUTOPILOT_INTERVAL_MS: '3000',
+    AUTOPILOT_MIN_CONFIDENCE: '0.5',
+    AUTOPILOT_MIN_SEVERITY: '2',
+    AUTOPILOT_MAX_ATTEMPTS: '3',
+    SLACK_WEBHOOK_URL: 'https://hooks.slack.com/services/T/B/xxx',
   });
   assert.equal(cfg.port, 9090);
   assert.equal(cfg.jevopsBin, '/opt/bin/jev-ops');
@@ -49,8 +62,19 @@ test('environment overrides are honoured', () => {
   assert.equal(cfg.demoAppPort, 4000);
   assert.equal(cfg.analyzeTail, 250);
   assert.equal(cfg.eventsWindowMinutes, 10);
+  assert.equal(cfg.autopilotArmed, true);
+  assert.equal(cfg.autopilotIntervalMs, 3000);
+  assert.equal(cfg.autopilotMinConfidence, 0.5);
+  assert.equal(cfg.autopilotMinSeverity, 2);
+  assert.equal(cfg.autopilotMaxAttempts, 3);
+  assert.equal(cfg.slackWebhookUrl, 'https://hooks.slack.com/services/T/B/xxx');
 });
 
 test('blank API key is treated as missing', () => {
   assert.equal(loadConfig({ TYPESAFE_API_KEY: '   ' }).typesafeApiKey, null);
+});
+
+test('AUTOPILOT_ARMED only accepts an explicit true', () => {
+  assert.equal(loadConfig({ AUTOPILOT_ARMED: 'yes' }).autopilotArmed, false);
+  assert.equal(loadConfig({ AUTOPILOT_ARMED: 'TRUE' }).autopilotArmed, true);
 });

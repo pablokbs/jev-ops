@@ -16,6 +16,12 @@ export interface Config {
   demoAppPort: number;
   analyzeTail: number;
   eventsWindowMinutes: number;
+  autopilotArmed: boolean;
+  autopilotIntervalMs: number;
+  autopilotMinConfidence: number;
+  autopilotMinSeverity: number;
+  autopilotMaxAttempts: number;
+  slackWebhookUrl: string | null;
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -39,5 +45,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     analyzeTail: Number.parseInt(env.ANALYZE_TAIL ?? '100', 10),
     // Warning events older than this are dropped from the diagnostic input.
     eventsWindowMinutes: Number.parseInt(env.K8S_EVENTS_WINDOW ?? '5', 10),
+    // Autopilot: closed-loop remediation. Disarmed by default — arm it from
+    // the dashboard (or here) once the talk reaches the automation part.
+    autopilotArmed: (env.AUTOPILOT_ARMED ?? '').trim().toLowerCase() === 'true',
+    autopilotIntervalMs: Number.parseInt(env.AUTOPILOT_INTERVAL_MS ?? '15000', 10),
+    autopilotMinConfidence: Number.parseFloat(env.AUTOPILOT_MIN_CONFIDENCE ?? '0.85'),
+    autopilotMinSeverity: Number.parseInt(env.AUTOPILOT_MIN_SEVERITY ?? '4', 10),
+    autopilotMaxAttempts: Number.parseInt(env.AUTOPILOT_MAX_ATTEMPTS ?? '1', 10),
+    // Optional Slack incoming webhook for escalation alerts (never required).
+    slackWebhookUrl: env.SLACK_WEBHOOK_URL?.trim() || null,
   };
 }

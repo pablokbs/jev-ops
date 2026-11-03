@@ -15,6 +15,9 @@
 #              CrashLoopBackOff; the live model discriminates via the
 #              lastReason: OOMKilled signal, validated in the manual live check)
 #   reset   -> back to healthy
+#   autopilot (mock, confidence/severity gates forced to 0 for determinism):
+#       arm via API -> crash loop -> the loop deletes the pods on its own
+#       (NO manual reset) -> deployment Ready again + action in the feed
 #
 # The semantic (live-model) expectations per fault are validated manually on
 # talk day — the mock is plumbing-only by design.
@@ -91,7 +94,9 @@ echo "==> Deploying the demo app"
 
 # ---- 2. start the server (mock provider; cleans up on exit) ---------------
 echo "==> Starting dashboard server on :${SERVER_PORT} (JEVOPS_PROVIDER=${PROVIDER})"
-PORT="${SERVER_PORT}" JEVOPS_PROVIDER="${PROVIDER}" node dist/server.js >/tmp/jev-ops-e2e-server.log 2>&1 &
+PORT="${SERVER_PORT}" JEVOPS_PROVIDER="${PROVIDER}" \
+  AUTOPILOT_MIN_CONFIDENCE=0 AUTOPILOT_MIN_SEVERITY=0 AUTOPILOT_INTERVAL_MS=3000 \
+  node dist/server.js >/tmp/jev-ops-e2e-server.log 2>&1 &
 SERVER_PID=$!
 trap 'kill "${SERVER_PID}" 2>/dev/null || true' EXIT
 wait_for "server up" 20 sh -c "curl -sf http://localhost:${SERVER_PORT}/api/config >/dev/null"
@@ -183,7 +188,35 @@ wait_for "deployment recovered after oom" 240 kubectl wait --for=condition=Ready
 ok "oom: recovered via reset (pod deletion fallback)"
 clear_events
 
-# ---- 7. final healthy check ------------------------------------------------
+# ---- 7. autopilot: closed-loop crash remediation ---------------------------
+# Armed via the API, the loop (3 s interval) must detect the crash loop and
+# delete the pods BY ITSELF — this phase never sends a manual reset.
+echo "==> Autopilot: closed-loop crash remediation (mock provider)"
+ARM_RESP="$(api POST /api/autopilot '{"armed":true}')"
+if echo "${ARM_RESP}" | jq -e '.armed == true' >/dev/null; then ok "autopilot: armed via API"; else bad "autopilot: failed to arm: ${ARM_RESP}"; fi
+
+FAULT_RESP="$(api POST /api/fault '{"mode":"crash"}')"
+if echo "${FAULT_RESP}" | jq -e '.ok == true' >/dev/null; then ok "autopilot: crash injected"; else bad "autopilot: crash POST failed: ${FAULT_RESP}"; fi
+# No intermediate CrashLoopBackOff wait: the loop may delete the pods before we
+# could observe it — healing without a manual reset is the real assertion.
+sleep 5
+
+wait_for "autopilot healed the crash loop" 240 kubectl wait --for=condition=Ready pod -l app=demo-app -n "${NS}" --timeout=30s
+ok "autopilot: deployment Ready again WITHOUT a manual reset"
+
+AUTOPILOT_STATE="$(api GET /api/autopilot)"
+if echo "${AUTOPILOT_STATE}" | jq -e '.feed[] | select(.kind=="action")' >/dev/null; then
+  ok "autopilot: delete-pods action recorded in the feed"
+else
+  bad "autopilot: no action recorded: $(echo "${AUTOPILOT_STATE}" | jq -c '.feed[0:4]')"
+fi
+
+api POST /api/autopilot '{"armed":false}' >/dev/null
+DISARMED="$(api GET /api/autopilot)"
+if echo "${DISARMED}" | jq -e '.armed == false' >/dev/null; then ok "autopilot: disarmed after the check"; else bad "autopilot: failed to disarm"; fi
+clear_events
+
+# ---- 8. final healthy check ------------------------------------------------
 clear_events
 ANALYZE="$(api POST /api/analyze '{}')"
 K8S_HEALTH="$(echo "${ANALYZE}" | jq -r '.analyses[] | select(.pack=="kubernetes") | .decisions.health.value // "missing"')"

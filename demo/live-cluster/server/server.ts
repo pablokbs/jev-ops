@@ -13,11 +13,12 @@ import {
   podBreakdown,
   podState,
 } from './kubectl.js';
-import { buildPodSummaryLines, collectAppInput, collectK8sInput, formatEvents } from './collector.js';
-import { analyze } from './jevops.js';
+import { buildPodSummaryLines, formatEvents } from './collector.js';
 import { FAULT_MODES, triggerFault, type FaultMode } from './faults.js';
+import { Autopilot } from './autopilot.js';
 
 const cfg = loadConfig();
+const autopilot = new Autopilot(cfg);
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
 const MIME: Record<string, string> = {
@@ -121,31 +122,8 @@ async function handleLogs(kind: string): Promise<{ status: number; body: unknown
 }
 
 async function handleAnalyze(): Promise<{ status: number; body: unknown }> {
-  const [app, k8s, context] = await Promise.all([collectAppInput(cfg), collectK8sInput(cfg), getContext(cfg)]);
-  const outcomes = await Promise.all([
-    analyze({
-      bin: cfg.jevopsBin,
-      packDir: cfg.packDir,
-      apiKey: cfg.typesafeApiKey,
-      provider: cfg.provider,
-      pack: app.pack,
-      input: app.input,
-      command: app.command,
-    }),
-    analyze({
-      bin: cfg.jevopsBin,
-      packDir: cfg.packDir,
-      apiKey: cfg.typesafeApiKey,
-      provider: cfg.provider,
-      pack: k8s.pack,
-      input: k8s.input,
-      command: k8s.command,
-    }),
-  ]);
-  return {
-    status: 200,
-    body: { ts: new Date().toISOString(), cluster: { context, namespace: cfg.namespace }, analyses: outcomes },
-  };
+  // Shared with the autopilot loop: same collect → analyze → policy cycle.
+  return { status: 200, body: await autopilot.runOnce() };
 }
 
 async function handleFault(mode: unknown): Promise<{ status: number; body: unknown }> {
@@ -163,10 +141,31 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/api/config' && method === 'GET') {
     sendJson(res, 200, {
       hasApiKey: cfg.typesafeApiKey !== null,
+      hasSlackWebhook: cfg.slackWebhookUrl !== null,
       jevopsBin: cfg.jevopsBin,
       packDir: cfg.packDir,
       analyzeTail: cfg.analyzeTail,
     });
+    return;
+  }
+
+  if (urlPath === '/api/autopilot' && method === 'GET') {
+    sendJson(res, 200, autopilot.getState());
+    return;
+  }
+
+  if (urlPath === '/api/autopilot' && method === 'POST') {
+    readBody(req)
+      .then((body) => {
+        const armed = (body as { armed?: unknown } | null)?.armed;
+        if (typeof armed !== 'boolean') {
+          sendJson(res, 400, { error: 'body must be {"armed": true|false}' });
+          return;
+        }
+        autopilot.setArmed(armed);
+        sendJson(res, 200, autopilot.getState());
+      })
+      .catch((e: unknown) => sendJson(res, 400, { error: message(e) }));
     return;
   }
 
