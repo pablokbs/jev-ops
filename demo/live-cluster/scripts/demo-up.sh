@@ -5,11 +5,17 @@
 #   - Uses kubectl's current context if a cluster is already reachable
 #     (local kind, minikube, or an external cloud cluster via K8S_KUBECONFIG).
 #   - Otherwise creates a local kind cluster named $KIND_CLUSTER.
-#   - Builds the demo app image, loads it into kind when running on kind,
-#     applies the Deployment and waits for the rollout.
+#   - On kind: builds demo-app:local and loads it into the cluster.
+#   - On any other (external) cluster: deploys the published registry image
+#     (PUBLISHED_IMAGE below) — a local build is useless there because the
+#     nodes cannot see your Docker daemon. Also verifies the tag exists in
+#     the registry before deploying, so you get a clear error instead of
+#     ImagePullBackOff.
+#   - Applies the Deployment and waits for the rollout.
 #
 # Env:
-#   DEMO_APP_IMAGE   image tag to build/load (default: demo-app:local)
+#   DEMO_APP_IMAGE   override the image tag (default: demo-app:local on kind,
+#                    PUBLISHED_IMAGE on external clusters)
 #   KIND_CLUSTER     kind cluster name (default: jev-ops-demo)
 #   K8S_NAMESPACE    namespace to deploy into (default: default)
 #   K8S_KUBECONFIG   external kubeconfig (skips kind creation entirely)
@@ -17,7 +23,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-DEMO_APP_IMAGE="${DEMO_APP_IMAGE:-demo-app:local}"
+# Keep in sync with DEFAULT_IMAGE in publish-image.sh.
+PUBLISHED_IMAGE="pablokbs/jev-ops-demo-app:2026.11"
+DEMO_APP_IMAGE="${DEMO_APP_IMAGE:-}"
 KIND_CLUSTER="${KIND_CLUSTER:-jev-ops-demo}"
 K8S_NAMESPACE="${K8S_NAMESPACE:-default}"
 JEVOPS_BIN="${JEVOPS_BIN:-jev-ops}"
@@ -54,15 +62,36 @@ else
   fi
 fi
 
-step "Building demo app image '${DEMO_APP_IMAGE}'"
-docker build -q -t "${DEMO_APP_IMAGE}" app/ >/dev/null
-echo "Image built."
-
-# Only load into kind when we are actually running on kind; external clusters
-# pull from a registry instead (see scripts/publish-image.sh).
+# Pick the image strategy for the cluster we are actually talking to.
 if kubectl config current-context 2>/dev/null | grep -q "kind-"; then
+  IS_KIND=1
+else
+  IS_KIND=0
+fi
+
+if [[ -z "${DEMO_APP_IMAGE}" ]]; then
+  if [[ "${IS_KIND}" == 1 ]]; then
+    DEMO_APP_IMAGE="demo-app:local"
+  else
+    DEMO_APP_IMAGE="${PUBLISHED_IMAGE}"
+  fi
+fi
+
+if [[ "${IS_KIND}" == 1 ]]; then
+  step "Building demo app image '${DEMO_APP_IMAGE}'"
+  docker build -q -t "${DEMO_APP_IMAGE}" app/ >/dev/null
+  echo "Image built."
+
   step "Loading image into kind"
   kind load docker-image "${DEMO_APP_IMAGE}" --name "${KIND_CLUSTER}"
+else
+  step "External cluster — using registry image '${DEMO_APP_IMAGE}'"
+  echo "Skipping local build; external nodes pull from the registry."
+  if ! docker buildx imagetools inspect "${DEMO_APP_IMAGE}" >/dev/null 2>&1; then
+    echo "ERROR: '${DEMO_APP_IMAGE}' is not pullable (missing tag or registry auth)." >&2
+    echo "  Publish it first: ./scripts/publish-image.sh ${DEMO_APP_IMAGE}" >&2
+    exit 1
+  fi
 fi
 
 step "Applying manifests (namespace '${K8S_NAMESPACE}')"

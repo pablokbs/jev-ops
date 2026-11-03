@@ -98,10 +98,11 @@ The MacBook stays fast; the demo runs against a small cloud cluster.
 1. **Publish the image** (the cloud cluster can't see locally built images):
    ```bash
    cd demo/live-cluster
-   ./scripts/publish-image.sh <registry>/<owner>/jev-ops-demo-app:RELEASE_TAG
+   ./scripts/publish-image.sh          # defaults to Docker Hub: pablokbs/jev-ops-demo-app:2026.11
+   # or: ./scripts/publish-image.sh <registry>/<owner>/jev-ops-demo-app:RELEASE_TAG
    ```
 2. **Kubeconfig**: copy the cloud kubeconfig to this repo as `*.kubeconfig` (gitignored) and set `K8S_KUBECONFIG`. Or reuse your default context with `K8S_CONTEXT=<name>`.
-3. **Deploy**: `./scripts/demo-up.sh` (uses the existing reachable context; set `DEMO_APP_IMAGE` to the published tag if you don't want to `kubectl set image`).
+3. **Deploy**: `./scripts/demo-up.sh` (uses the existing reachable context). On a non-kind cluster it deploys the published image by default and verifies the tag exists in the registry first, so you get a clear error instead of `ImagePullBackOff` — no `kubectl set image` needed.
 4. **Rehearse once against the cloud cluster**: full `./scripts/e2e-smoke.sh` (network + latency + RBAC sanity) and one live `Analyze` with a real key.
 5. **On stage**: `export TYPESAFE_API_KEY=... && npm run dev`. The dashboard shows the cloud context in the header pill.
 
@@ -111,7 +112,7 @@ The MacBook stays fast; the demo runs against a small cloud cluster.
 | :--- | :--- |
 | `K8S_KUBECONFIG` | path to the cluster's kubeconfig (no `~/.kube/config` changes) |
 | `K8S_CONTEXT` | context name inside that kubeconfig |
-| `DEMO_APP_IMAGE` | image tag for `demo-up.sh`/`publish-image.sh` |
+| `DEMO_APP_IMAGE` | image tag override for `demo-up.sh` (defaults: `demo-app:local` on kind, the published Docker Hub tag on external clusters) · `publish-image.sh` takes the tag as an argument |
 
 `kubectl exec` is used for fault injection — it works on any cluster you control (no Ingress/LoadBalancer needed).
 
@@ -162,7 +163,8 @@ The e2e (`e2e-smoke.sh`) deploys, injects every fault, and asserts the typed dec
 - **"No running pod to exec into"** (fault button) → the cluster is mid-crash; press **Recover** (or run `kubectl delete pod -l app=demo-app`).
 - **OOM square then everything green again** → expected: the pod restarted and the fault flag re-arms it; re-press **OOM** or **Analyze** while it cycles.
 - **Jev slow or 429/529** → jev-ops retries automatically (3 retries, backoff); the UI shows `elapsed_ms` — on stage that's part of the demo.
-- **Image pull at the venue** → local kind: `kind load` is done by `demo-up.sh`; cloud: `publish-image.sh` beforehand.
+- **Image pull at the venue** → local kind: `kind load` is done by `demo-up.sh`; cloud: `publish-image.sh` beforehand (builds a multi-arch `linux/amd64,linux/arm64` manifest, so it pulls on amd64 cloud nodes even when built on Apple Silicon).
+- **`ImagePullBackOff` on a cloud cluster right after `set image`** → the image is arm64-only (built on a Mac with plain `docker build`). Re-run `publish-image.sh` (buildx multi-arch) and `kubectl delete pod -l app=demo-app` to force a fresh pull.
 
 ## Repo layout
 
