@@ -87,6 +87,7 @@ Live inference requires a valid API key. The CLI intentionally does not silently
 - [KubeAuto Day North America — event details](https://kubeauto.day/north-america)
 - [KubeAuto Day](https://kubeauto.day/)
 - [TypeSafe System One](https://docs.typesafe.ai/introduction)
+- [Download Slides - SpeakerDeck](https://speakerdeck.com/pablokbs/kubecon-us-2026-jev-ops)
 
 ## About the speaker
 
