@@ -2,7 +2,7 @@
 
 ## Kubernetes Automation Day North America · November 9, 2026
 
-[![KubeAuto Day North America](https://kubeauto.day/__l5e/assets-v1/638c19db-c105-4b54-ab99-f3111b602c6a/kad-north-america-black.png)](https://kubeauto.day/north-america)
+[![KubeAuto Day North America](./demo/live-cluster/jev-ops.png)](https://kubeauto.day/north-america)
 
 **Pablo Fredrikson · Principal Engineer, Bitso**  
 Presented at [Kubernetes Automation Day North America](https://kubeauto.day/north-america), co-located with KubeCon + CloudNativeCon NA 2026 in Salt Lake City.
