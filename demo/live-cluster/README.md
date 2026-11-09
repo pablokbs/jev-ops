@@ -103,6 +103,22 @@ Same UI, same pipeline, zero API calls — perfect for practising the script. Th
 
 Faults survive container restarts via a flag file in the pod, so crash/OOM loops are persistent until you recover. From the terminal: `./scripts/trigger-fault.sh boom|crash|oom|reset|status`.
 
+## Run the binary by hand
+
+No cluster, no dashboard — one example line on stdin, typed JSON on stdout. The script prints the pipe and runs it:
+
+```bash
+./scripts/analyze.sh
+# echo "error 500 de ejemplo" | jev-ops analyze demo-app --pack-dir packs --json
+
+./scripts/analyze.sh crash
+./scripts/analyze.sh healthy
+./scripts/analyze.sh "tu linea"
+JEVOPS_PROVIDER=mock ./scripts/analyze.sh crash   # rehearsal: no key, no network
+```
+
+`--pack-dir packs` is what makes the custom `demo-app` pack visible. The binary reads that one line on stdin and prints the decisions. The offline mock only reacts to a few markers (`CrashLoopBackOff`, `OOMKilled`, `status: Running`), so use those examples when rehearsing without a key.
+
 ## Autopilot — closing the loop
 
 Manual mode shows Jev's typed decisions; the **autopilot** acts on them. Arm it with the big **🤖 Autopilot** button (`POST /api/autopilot {"armed":true}` from the terminal). Disarmed is the default and every server boot starts disarmed — arming is a deliberate stage move.
@@ -271,5 +287,5 @@ demo/live-cluster/
 ├── packs/demo-app/ # custom pack — the "packs are data" story, no Rust changes
 ├── server/         # Node backend: config, kubectl wrapper, collector, jevops runner, faults, autopilot (policy + loop), HTTP
 ├── public/         # zero-dependency dashboard (index.html/app.js/style.css)
-└── scripts/        # demo-up.sh · publish-image.sh · trigger-fault.sh · e2e-smoke.sh
+└── scripts/        # demo-up.sh · publish-image.sh · trigger-fault.sh · analyze.sh · e2e-smoke.sh
 ```
