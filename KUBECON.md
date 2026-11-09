@@ -93,4 +93,4 @@ Live inference requires a valid API key. The CLI intentionally does not silently
 
 Pablo Fredrikson is a Principal Engineer at Bitso and creates technical content as Pelado Nerd.
 
-[GitHub](https://github.com/pablokbs) · [Pelado Nerd](https://peladonerd.com)
+[GitHub](https://github.com/pablokbs) · [Pelado Nerd](https://peladonerd.com) · [LinkedIn](https://www.linkedin.com/in/pablofredrikson)
